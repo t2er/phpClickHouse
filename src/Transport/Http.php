@@ -418,43 +418,53 @@ class Http
     }
 
 
+    /**
+     * @param $handle
+     *
+     * @return bool
+     */
     public function __findXClickHouseProgress($handle): bool
     {
-        $code = curl_getinfo($handle, CURLINFO_HTTP_CODE);
+        $code = (int)curl_getinfo($handle, CURLINFO_HTTP_CODE);
 
         // Search X-ClickHouse-Progress
-        if ($code == 200) {
+        if ($code === 200) {
             $response = curl_multi_getcontent($handle);
-            $header_size = curl_getinfo($handle, CURLINFO_HEADER_SIZE);
-            if (!$header_size) {
+            $headerSize = curl_getinfo($handle, CURLINFO_HEADER_SIZE);
+            if (!$headerSize) {
                 return false;
             }
 
-            $header = substr($response, 0, $header_size);
-            if (!$header_size) {
+            $header = substr($response, 0, $headerSize);
+            if (!$header) {
                 return false;
             }
 
-            $pos = strrpos($header, 'X-ClickHouse-Summary:');
-            if (!$pos) {
+            $headerKeys = ['X-ClickHouse-Progress:', 'X-ClickHouse-Summary:'];
+            foreach ($headerKeys as $headerKey) {
+                $position = strrpos($header, $headerKey);
+
+                if (false !== $position) {
+                    break;
+                }
+            }
+
+            if (false === $position) {
                 return false;
             }
 
-            $last = substr($header, $pos);
-            $data = @json_decode(str_ireplace('X-ClickHouse-Summary:', '', $last), true);
+            $last = substr($header, $position);
+            $data = @json_decode(str_ireplace($headerKey, '', $last), true);
 
             if ($data && is_callable($this->xClickHouseProgress)) {
-
                 if (is_array($this->xClickHouseProgress)) {
                     call_user_func_array($this->xClickHouseProgress, [$data]);
                 } else {
                     call_user_func($this->xClickHouseProgress, $data);
                 }
-
-
             }
-
         }
+
         return false;
     }
 
